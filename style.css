@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Luckiest+Guy&display=swap');
+
+:root{
+  --pink:#EC2F7C;
+  --pink-dark:#B71C5D;
+  --cream:#FFF6FA;
+  --ink:#2E2A4A;
+  --gold:#F5A623;
+  --green:#1FA97A;
+  --red:#E5484D;
+  --card-radius:22px;
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Cairo',sans-serif;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(236,47,124,.10), transparent 40%),
+    radial-gradient(circle at 88% 85%, rgba(31,169,122,.10), transparent 40%),
+    var(--cream);
+  color:var(--ink);
+  direction:rtl;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+
+.card{
+  width:100%;
+  max-width:420px;
+  background:#fff;
+  border-radius:var(--card-radius);
+  padding:32px 28px;
+  box-shadow:0 20px 50px -20px rgba(46,42,74,.25);
+  border:1px solid rgba(236,47,124,.08);
+}
+
+.card.wide{max-width:760px;}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  justify-content:center;
+  margin-bottom:6px;
+}
+
+.brand .antler{font-size:28px;}
+
+.brand h1{
+  font-family:'Luckiest Guy',cursive;
+  font-weight:400;
+  font-size:26px;
+  letter-spacing:.5px;
+  color:var(--pink);
+  margin:0;
+}
+
+.subtitle{
+  text-align:center;
+  color:#8b8599;
+  font-size:14px;
+  margin:0 0 26px;
+}
+
+label{
+  display:block;
+  font-size:13px;
+  font-weight:600;
+  margin:14px 0 6px;
+  color:var(--ink);
+}
+
+input[type=email],input[type=password],input[type=text],select{
+  width:100%;
+  padding:13px 14px;
+  border-radius:14px;
+  border:1.5px solid #ecdfe7;
+  background:#fff8fb;
+  font-family:'Cairo',sans-serif;
+  font-size:15px;
+  outline:none;
+  transition:border-color .15s;
+}
+input:focus,select:focus{border-color:var(--pink);}
+
+.role-toggle{
+  display:flex;
+  gap:10px;
+  margin-top:6px;
+}
+.role-toggle label{
+  flex:1;
+  margin:0;
+  text-align:center;
+  padding:12px 8px;
+  border-radius:14px;
+  border:1.5px solid #ecdfe7;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:600;
+  color:#8b8599;
+  transition:.15s;
+}
+.role-toggle input{display:none;}
+.role-toggle input:checked + span{color:var(--pink);}
+.role-toggle label:has(input:checked){
+  border-color:var(--pink);
+  background:rgba(236,47,124,.06);
+  color:var(--pink);
+}
+
+button.primary{
+  width:100%;
+  margin-top:24px;
+  padding:14px;
+  border:none;
+  border-radius:16px;
+  background:var(--pink);
+  color:#fff;
+  font-family:'Cairo',sans-serif;
+  font-weight:700;
+  font-size:16px;
+  cursor:pointer;
+  transition:transform .12s, background .15s;
+}
+button.primary:hover{background:var(--pink-dark);}
+button.primary:active{transform:scale(.98);}
+button.primary:disabled{opacity:.55;cursor:default;}
+
+button.ghost{
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  border:1.5px solid #ecdfe7;
+  border-radius:16px;
+  background:transparent;
+  color:var(--ink);
+  font-family:'Cairo',sans-serif;
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.switch-link{
+  text-align:center;
+  margin-top:18px;
+  font-size:13.5px;
+  color:#8b8599;
+}
+.switch-link a{color:var(--pink);font-weight:700;text-decoration:none;cursor:pointer;}
+
+.msg{
+  margin-top:14px;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:13.5px;
+  display:none;
+}
+.msg.show{display:block;}
+.msg.error{background:#fdeceb;color:var(--red);}
+.msg.success{background:#eafaf3;color:var(--green);}
+
+.status-badge{
+  display:inline-block;
+  padding:6px 16px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:700;
+}
+.status-pending{background:#fef3e2;color:var(--gold);}
+.status-active{background:#eafaf3;color:var(--green);}
+.status-expired{background:#fdeceb;color:var(--red);}
+.status-rejected{background:#f1eff5;color:#8b8599;}
+
+.center-loader{
+  text-align:center;
+  color:#8b8599;
+  font-size:14px;
+}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{
+  text-align:right;
+  padding:10px 8px;
+  color:#8b8599;
+  font-size:12px;
+  border-bottom:2px solid #f3edf1;
+}
+td{
+  padding:12px 8px;
+  border-bottom:1px solid #f3edf1;
+  vertical-align:middle;
+}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.btn-sm{
+  padding:7px 12px;
+  border-radius:10px;
+  border:none;
+  font-family:'Cairo',sans-serif;
+  font-size:12.5px;
+  font-weight:700;
+  cursor:pointer;
+}
+.btn-approve{background:var(--green);color:#fff;}
+.btn-renew{background:var(--gold);color:#fff;}
+.btn-reject{background:#fdeceb;color:var(--red);}
+.btn-approve:disabled,.btn-renew:disabled,.btn-reject:disabled{opacity:.4;cursor:default;}
+
+.empty-note{text-align:center;color:#b7b1c2;padding:26px 0;font-size:13.5px;}
+
+@media (max-width:480px){
+  .card{padding:24px 18px;}
+  table{font-size:12.5px;}
+  th:nth-child(4),td:nth-child(4){display:none;}
+}

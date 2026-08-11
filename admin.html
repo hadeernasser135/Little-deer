@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Deer — لوحة المديرة</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="card wide" id="card">
+  <div class="brand"><span class="antler">🦌</span><h1>Little Deer</h1></div>
+  <p class="subtitle">لوحة تحكم المديرة</p>
+
+  <div id="loading" class="center-loader">جاري التحميل...</div>
+  <div id="denied" class="msg error" style="display:none;text-align:center">
+    الصفحة دي مخصصة لحساب المديرة بس.
+  </div>
+
+  <div id="content" style="display:none">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;">
+      <button class="ghost" style="width:auto;padding:8px 16px;margin:0" id="logoutBtn">خروج</button>
+    </div>
+    <div id="usersContainer"></div>
+    <div class="empty-note" id="emptyNote" style="display:none">لسه مفيش أي حسابات مسجلة</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const ALL_BOOKS = [
+  {id:'grammar-1', label:'Grammar 1'},
+  {id:'grammar-2', label:'Grammar 2'},
+  {id:'grammar-3', label:'Grammar 3'},
+  {id:'grammar-4', label:'Grammar 4'}
+];
+
+function formatDate(ts){
+  if(!ts) return '—';
+  return ts.toDate().toLocaleDateString('ar-EG', {year:'numeric', month:'short', day:'numeric'});
+}
+
+function statusLabel(data){
+  const now = new Date();
+  const isExpired = data.status === 'active' && data.expiresAt && data.expiresAt.toDate() < now;
+  if(isExpired) return {text:'انتهى', cls:'status-expired'};
+  if(data.status === 'pending') return {text:'قيد المراجعة', cls:'status-pending'};
+  if(data.status === 'active') return {text:'مُفعّل', cls:'status-active'};
+  if(data.status === 'rejected') return {text:'مرفوض', cls:'status-rejected'};
+  if(data.status === 'suspended') return {text:'موقوف', cls:'status-rejected'};
+  return {text:data.status, cls:''};
+}
+
+async function generateUniqueStudentCode(){
+  for(let i=0; i<10; i++){
+    const code = 'LD-' + Math.floor(100000 + Math.random()*900000);
+    const existing = await db.collection('studentCodes').doc(code).get();
+    if(!existing.exists) return code;
+  }
+  throw new Error('couldn\'t generate a unique code');
+}
+
+async function loadUsers(){
+  const container = document.getElementById('usersContainer');
+  const emptyNote = document.getElementById('emptyNote');
+  container.innerHTML = '';
+
+  const snap = await db.collection('users').orderBy('createdAt', 'desc').get();
+  if(snap.empty){
+    emptyNote.style.display = 'block';
+    return;
+  }
+  emptyNote.style.display = 'none';
+
+  snap.forEach(doc => {
+    const data = doc.data();
+    const uid = doc.id;
+    const st = statusLabel(data);
+
+    const wrap = document.createElement('details');
+    wrap.style.cssText = 'border:1.5px solid #ecdfe7;border-radius:14px;margin-top:10px;padding:12px 14px;';
+
+    const booksChecked = data.allowedBooks || [];
+    const booksHtml = ALL_BOOKS.map(b => `
+      <label style="display:inline-flex;align-items:center;gap:6px;margin:4px 10px 4px 0;font-weight:400;font-size:13px;">
+        <input type="checkbox" data-book="${b.id}" ${booksChecked.includes(b.id) ? 'checked' : ''}>
+        ${b.label}
+      </label>
+    `).join('');
+
+    wrap.innerHTML = `
+      <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-weight:700">${data.name || '—'} <span style="font-weight:400;color:#8b8599;font-size:12px;">(${data.role === 'teacher' ? 'معلّم/ة' : 'طالب/ة'})</span></div>
+          <div style="color:#8b8599;font-size:12px">${data.email}${data.studentCode ? ' · ' + data.studentCode : ''}</div>
+        </div>
+        <span class="status-badge ${st.cls}">${st.text}</span>
+      </summary>
+
+      <div style="margin-top:14px;font-size:13px;color:#8b8599;">
+        تاريخ التسجيل: ${formatDate(data.createdAt)} — تاريخ الانتهاء: ${formatDate(data.expiresAt)}
+      </div>
+
+      ${data.role === 'student' ? `
+        <div style="margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;margin-bottom:4px;">الكتب المسموحة</div>
+          <div class="booksBox">${booksHtml}</div>
+          <button class="btn-sm btn-renew" data-action="saveBooks" style="margin-top:8px;">حفظ الكتب</button>
+        </div>
+      ` : ''}
+
+      <div class="row-actions" style="margin-top:14px;">
+        <button class="btn-sm btn-approve" data-action="approve">تفعيل سنة</button>
+        <button class="btn-sm btn-renew" data-action="renew">تجديد سنة</button>
+        <button class="btn-sm btn-reject" data-action="suspend">إيقاف</button>
+        <button class="btn-sm btn-reject" data-action="reject">رفض</button>
+      </div>
+    `;
+
+    wrap.dataset.uid = uid;
+    container.appendChild(wrap);
+  });
+}
+
+document.getElementById('usersContainer').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const wrap = btn.closest('details');
+  const uid = wrap.dataset.uid;
+  const action = btn.dataset.action;
+  const allButtons = wrap.querySelectorAll('button');
+  allButtons.forEach(b => b.disabled = true);
+
+  try{
+    if(action === 'approve'){
+      const doc = await db.collection('users').doc(uid).get();
+      const data = doc.data();
+      const now = new Date();
+      const updates = {
+        status: 'active',
+        activatedAt: firebase.firestore.Timestamp.fromDate(now),
+        expiresAt: firebase.firestore.Timestamp.fromDate(new Date(now.getTime() + ONE_YEAR_MS))
+      };
+      if(data.role === 'student' && !data.studentCode){
+        const code = await generateUniqueStudentCode();
+        updates.studentCode = code;
+        await db.collection('studentCodes').doc(code).set({uid: uid, name: data.name});
+      }
+      await db.collection('users').doc(uid).update(updates);
+
+    } else if(action === 'renew'){
+      const doc = await db.collection('users').doc(uid).get();
+      const data = doc.data();
+      const now = new Date();
+      const base = (data.expiresAt && data.expiresAt.toDate() > now) ? data.expiresAt.toDate() : now;
+      await db.collection('users').doc(uid).update({
+        status: 'active',
+        expiresAt: firebase.firestore.Timestamp.fromDate(new Date(base.getTime() + ONE_YEAR_MS))
+      });
+
+    } else if(action === 'suspend'){
+      await db.collection('users').doc(uid).update({ status: 'suspended' });
+
+    } else if(action === 'reject'){
+      await db.collection('users').doc(uid).update({ status: 'rejected' });
+
+    } else if(action === 'saveBooks'){
+      const checks = wrap.querySelectorAll('.booksBox input[type=checkbox]');
+      const selected = [];
+      checks.forEach(c => { if(c.checked) selected.push(c.dataset.book); });
+      await db.collection('users').doc(uid).update({ allowedBooks: selected });
+    }
+    await loadUsers();
+  }catch(err){
+    alert('حصل خطأ، حاولي تاني');
+    allButtons.forEach(b => b.disabled = false);
+  }
+});
+
+auth.onAuthStateChanged(async (user) => {
+  document.getElementById('loading').style.display = 'none';
+  if(!user || user.email !== ADMIN_EMAIL){
+    document.getElementById('denied').style.display = 'block';
+    setTimeout(() => window.location.href = 'login.html', 1800);
+    return;
+  }
+  document.getElementById('content').style.display = 'block';
+  loadUsers();
+});
+
+document.getElementById('logoutBtn').onclick = async () => {
+  await auth.signOut();
+  window.location.href = 'login.html';
+};
+</script>
+</body>
+</html>

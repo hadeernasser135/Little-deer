@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Deer — حسابي</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="brand"><span class="antler">🦌</span><h1>Little Deer</h1></div>
+  <p class="subtitle">حسابي</p>
+
+  <div id="loading" class="center-loader">جاري التحميل...</div>
+
+  <div id="content" style="display:none">
+    <div style="text-align:center;margin-bottom:18px;">
+      <div id="userName" style="font-weight:700;font-size:17px;margin-bottom:6px;"></div>
+      <div id="userRole" style="color:#8b8599;font-size:13px;margin-bottom:12px;"></div>
+      <span class="status-badge" id="statusBadge"></span>
+    </div>
+
+    <p id="statusText" style="text-align:center;font-size:14px;color:#665f77;line-height:1.8;"></p>
+
+    <button class="ghost" id="resendBtn" style="display:none">إعادة إرسال إيميل التأكيد</button>
+
+    <!-- Student-only area -->
+    <div id="studentArea" style="display:none">
+      <label>كود الطالب بتاعك</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="studentCodeBox" readonly style="text-align:center;font-weight:700;letter-spacing:1px;">
+        <button class="btn-sm btn-approve" id="copyCodeBtn" type="button" style="white-space:nowrap;">نسخ</button>
+      </div>
+      <p style="font-size:12px;color:#8b8599;margin-top:6px;">اديه للمعلم/ة اللي هتتابعك بيه — مش باسورد، محدش يقدر يدخل حسابك بيه لوحده.</p>
+
+      <div id="requestsBlock" style="display:none;margin-top:22px;">
+        <label>طلبات ربط جديدة</label>
+        <div id="requestsList"></div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <label>المدرسين المرتبطين بيكي</label>
+        <div id="teachersList"></div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <label>الكتب المتاحة ليكي</label>
+        <div id="booksList"></div>
+      </div>
+    </div>
+
+    <!-- Teacher-only area -->
+    <div id="teacherArea" style="display:none">
+      <a href="teacher-dashboard.html"><button class="primary" type="button">لوحة الطلاب 👩‍🏫</button></a>
+    </div>
+
+    <button class="ghost" id="logoutBtn">تسجيل الخروج</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const BOOK_NAMES = {
+  'grammar-1': 'Little Deer Grammar 1',
+  'grammar-2': 'Little Deer Grammar 2',
+  'grammar-3': 'Little Deer Grammar 3',
+  'grammar-4': 'Little Deer Grammar 4'
+};
+
+function formatDate(ts){
+  if(!ts) return '';
+  return ts.toDate().toLocaleDateString('ar-EG', {year:'numeric', month:'long', day:'numeric'});
+}
+
+let currentUid = null;
+let currentData = null;
+
+auth.onAuthStateChanged(async (user) => {
+  if(!user){ window.location.href = 'login.html'; return; }
+  await user.reload();
+  currentUid = user.uid;
+
+  const doc = await db.collection('users').doc(user.uid).get();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  if(!doc.exists){
+    document.getElementById('statusText').textContent = 'حصل خطأ في بيانات حسابك، تواصلي مع المعلمة.';
+    return;
+  }
+  currentData = doc.data();
+  renderStatus(user, currentData);
+});
+
+function renderStatus(user, data){
+  document.getElementById('userName').textContent = data.name || data.email;
+  document.getElementById('userRole').textContent = data.role === 'teacher' ? 'حساب معلّم/ة' : 'حساب طالب/ة';
+
+  const badge = document.getElementById('statusBadge');
+  const statusText = document.getElementById('statusText');
+  const resendBtn = document.getElementById('resendBtn');
+
+  const now = new Date();
+  const isExpired = data.status === 'active' && data.expiresAt && data.expiresAt.toDate() < now;
+
+  // 1) الإيميل لسه مش متأكد
+  if(!user.emailVerified){
+    badge.textContent = 'محتاجة تأكيد الإيميل';
+    badge.className = 'status-badge status-pending';
+    statusText.textContent = 'بعتنالك رسالة تأكيد على إيميلك، افتحيها ودوسي على الرابط. بعدين رجّعي افتحي الصفحة دي تاني.';
+    resendBtn.style.display = 'block';
+    resendBtn.onclick = async () => {
+      resendBtn.disabled = true; resendBtn.textContent = 'جاري الإرسال...';
+      try{ await user.sendEmailVerification(); resendBtn.textContent = 'اتبعتت تاني ✓'; }
+      catch(e){ resendBtn.textContent = 'حصل خطأ، حاولي بعد شوية'; }
+    };
+    return;
+  }
+
+  // 2) قيد المراجعة
+  if(data.status === 'pending'){
+    badge.textContent = 'قيد المراجعة';
+    badge.className = 'status-badge status-pending';
+    statusText.textContent = 'إيميلك اتأكد. دلوقتي حسابك مستني موافقة المعلمة هادير.';
+    return;
+  }
+
+  // 3) مرفوض
+  if(data.status === 'rejected'){
+    badge.textContent = 'مرفوض';
+    badge.className = 'status-badge status-rejected';
+    statusText.textContent = 'حصلت مشكلة في تفعيل حسابك، تواصلي مع المعلمة هادير.';
+    return;
+  }
+
+  // 4) موقوف
+  if(data.status === 'suspended'){
+    badge.textContent = 'الحساب موقوف';
+    badge.className = 'status-badge status-rejected';
+    statusText.textContent = 'حسابك متوقف مؤقتاً، تواصلي مع المعلمة هادير.';
+    return;
+  }
+
+  // 5) انتهت المدة
+  if(isExpired || data.status === 'expired'){
+    badge.textContent = 'الاشتراك انتهى';
+    badge.className = 'status-badge status-expired';
+    statusText.textContent = 'اشتراكك خلص. للتجديد تواصلي مع المعلمة هادير.';
+    return;
+  }
+
+  // 6) مفعّل وشغال
+  if(data.status === 'active'){
+    badge.textContent = 'مُفعّل';
+    badge.className = 'status-badge status-active';
+    statusText.textContent = 'اشتراكك شغال لغاية ' + formatDate(data.expiresAt) + '.';
+
+    if(data.role === 'student'){
+      document.getElementById('studentArea').style.display = 'block';
+      renderStudentArea(data);
+    } else {
+      document.getElementById('teacherArea').style.display = 'block';
+    }
+  }
+}
+
+async function renderStudentArea(data){
+  document.getElementById('studentCodeBox').value = data.studentCode || '—';
+
+  document.getElementById('copyCodeBtn').onclick = () => {
+    const box = document.getElementById('studentCodeBox');
+    box.select();
+    navigator.clipboard.writeText(box.value);
+    const btn = document.getElementById('copyCodeBtn');
+    btn.textContent = 'اتنسخ ✓';
+    setTimeout(() => btn.textContent = 'نسخ', 1500);
+  };
+
+  // الكتب المتاحة
+  const booksList = document.getElementById('booksList');
+  booksList.innerHTML = '';
+  if(!data.allowedBooks || data.allowedBooks.length === 0){
+    booksList.innerHTML = '<p class="empty-note" style="padding:10px 0">لسه مفيش كتب متاحة ليكي</p>';
+  } else {
+    data.allowedBooks.forEach(id => {
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:10px 12px;background:#fef8fb;border-radius:12px;margin-top:6px;font-size:13.5px;';
+      div.textContent = '📘 ' + (BOOK_NAMES[id] || id);
+      booksList.appendChild(div);
+    });
+  }
+
+  // طلبات ربط جديدة
+  const reqSnap = await db.collection('connectionRequests')
+    .where('studentId', '==', currentUid)
+    .where('status', '==', 'pending')
+    .get();
+
+  const requestsBlock = document.getElementById('requestsBlock');
+  const requestsList = document.getElementById('requestsList');
+  requestsList.innerHTML = '';
+
+  if(!reqSnap.empty){
+    requestsBlock.style.display = 'block';
+    reqSnap.forEach(reqDoc => {
+      const r = reqDoc.data();
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:12px;background:#fff8fb;border:1.5px solid #ecdfe7;border-radius:14px;margin-top:8px;';
+      div.innerHTML = `
+        <div style="font-weight:700;margin-bottom:8px;">${r.teacherName} عايز/ة يتابعك</div>
+        <div class="row-actions">
+          <button class="btn-sm btn-approve" data-id="${reqDoc.id}" data-teacher="${r.teacherId}" data-action="accept">قبول</button>
+          <button class="btn-sm btn-reject" data-id="${reqDoc.id}" data-action="reject">رفض</button>
+        </div>`;
+      requestsList.appendChild(div);
+    });
+  }
+
+  requestsList.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    btn.disabled = true;
+    const reqId = btn.dataset.id;
+    try{
+      if(btn.dataset.action === 'accept'){
+        const teacherId = btn.dataset.teacher;
+        await db.collection('links').doc(teacherId + '_' + currentUid).set({
+          teacherId: teacherId,
+          studentId: currentUid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await db.collection('connectionRequests').doc(reqId).update({status:'accepted', respondedAt: firebase.firestore.FieldValue.serverTimestamp()});
+      } else {
+        await db.collection('connectionRequests').doc(reqId).update({status:'rejected', respondedAt: firebase.firestore.FieldValue.serverTimestamp()});
+      }
+      renderStudentArea(data);
+    }catch(err){
+      alert('حصل خطأ، حاولي تاني');
+      btn.disabled = false;
+    }
+  }, {once:true});
+
+  // المدرسين المرتبطين
+  const linksSnap = await db.collection('links').where('studentId', '==', currentUid).get();
+  const teachersList = document.getElementById('teachersList');
+  teachersList.innerHTML = '';
+
+  if(linksSnap.empty){
+    teachersList.innerHTML = '<p class="empty-note" style="padding:10px 0">مفيش مدرسين مرتبطين لسه</p>';
+  } else {
+    for(const linkDoc of linksSnap.docs){
+      const link = linkDoc.data();
+      const teacherDoc = await db.collection('users').doc(link.teacherId).get();
+      const tName = teacherDoc.exists ? teacherDoc.data().name : 'معلّم/ة';
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fef8fb;border-radius:12px;margin-top:6px;';
+      div.innerHTML = `<span style="font-size:13.5px;">${tName}</span>`;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-sm btn-reject';
+      removeBtn.textContent = 'إلغاء الربط';
+      removeBtn.onclick = async () => {
+        removeBtn.disabled = true;
+        await db.collection('links').doc(linkDoc.id).delete();
+        renderStudentArea(data);
+      };
+      div.appendChild(removeBtn);
+      teachersList.appendChild(div);
+    }
+  }
+}
+
+document.getElementById('logoutBtn').onclick = async () => {
+  await auth.signOut();
+  window.location.href = 'login.html';
+};
+</script>
+</body>
+</html>

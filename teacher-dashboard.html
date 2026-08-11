@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Deer — لوحة المعلّم</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="card wide" id="card">
+  <div class="brand"><span class="antler">🦌</span><h1>Little Deer</h1></div>
+  <p class="subtitle">لوحة المعلّم/ة</p>
+
+  <div id="loading" class="center-loader">جاري التحميل...</div>
+
+  <div id="content" style="display:none">
+    <a href="dashboard.html" style="font-size:13px;color:#8b8599;">→ رجوع لحسابي</a>
+
+    <div style="margin-top:16px;">
+      <label>إضافة طالب بالكود</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="codeInput" placeholder="مثال: LD-482715" style="text-transform:uppercase;">
+        <button class="btn-sm btn-approve" id="lookupBtn" type="button" style="white-space:nowrap;">بحث</button>
+      </div>
+      <div id="lookupResult" style="margin-top:10px;"></div>
+      <div class="msg" id="addMsg"></div>
+    </div>
+
+    <div style="margin-top:26px;">
+      <label>طلبات مرسلة قيد الانتظار</label>
+      <div id="pendingList"></div>
+    </div>
+
+    <div style="margin-top:26px;">
+      <label>طلابي</label>
+      <div id="studentsList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+let currentUid = null;
+let currentName = null;
+let foundStudent = null;
+
+auth.onAuthStateChanged(async (user) => {
+  if(!user){ window.location.href = 'login.html'; return; }
+
+  const doc = await db.collection('users').doc(user.uid).get();
+  const data = doc.exists ? doc.data() : null;
+
+  document.getElementById('loading').style.display = 'none';
+
+  if(!data || data.role !== 'teacher' || data.status !== 'active'){
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loading').textContent = 'مفيش عندك صلاحية تدخلي الصفحة دي دلوقتي';
+    return;
+  }
+
+  currentUid = user.uid;
+  currentName = data.name;
+  document.getElementById('content').style.display = 'block';
+  loadPendingRequests();
+  loadStudents();
+});
+
+// ---- البحث بالكود ----
+document.getElementById('lookupBtn').onclick = async () => {
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  const resultBox = document.getElementById('lookupResult');
+  const msg = document.getElementById('addMsg');
+  msg.className = 'msg';
+  resultBox.innerHTML = '';
+  foundStudent = null;
+
+  if(!code) return;
+
+  const codeDoc = await db.collection('studentCodes').doc(code).get();
+  if(!codeDoc.exists){
+    msg.className = 'msg show error';
+    msg.textContent = 'مفيش طالب بالكود ده';
+    return;
+  }
+
+  foundStudent = { uid: codeDoc.data().uid, name: codeDoc.data().name, code: code };
+  resultBox.innerHTML = `
+    <div style="padding:12px;background:#fef8fb;border-radius:14px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;">${foundStudent.name}</span>
+      <button class="btn-sm btn-approve" id="sendReqBtn" type="button">إرسال طلب ربط</button>
+    </div>
+  `;
+
+  document.getElementById('sendReqBtn').onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = 'جاري الإرسال...';
+    try{
+      await db.collection('connectionRequests').add({
+        teacherId: currentUid,
+        teacherName: currentName,
+        studentId: foundStudent.uid,
+        studentCode: foundStudent.code,
+        studentName: foundStudent.name,
+        status: 'pending',
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      msg.className = 'msg show success';
+      msg.textContent = 'اتبعت الطلب، استني موافقة الطالب/ة';
+      document.getElementById('codeInput').value = '';
+      resultBox.innerHTML = '';
+      loadPendingRequests();
+    }catch(err){
+      msg.className = 'msg show error';
+      msg.textContent = 'حصل خطأ، حاولي تاني';
+      e.target.disabled = false; e.target.textContent = 'إرسال طلب ربط';
+    }
+  };
+};
+
+async function loadPendingRequests(){
+  const box = document.getElementById('pendingList');
+  box.innerHTML = '';
+  const snap = await db.collection('connectionRequests')
+    .where('teacherId', '==', currentUid)
+    .where('status', '==', 'pending')
+    .get();
+
+  if(snap.empty){
+    box.innerHTML = '<p class="empty-note" style="padding:10px 0">مفيش طلبات مستنية</p>';
+    return;
+  }
+  snap.forEach(doc => {
+    const r = doc.data();
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:10px 12px;background:#fef3e2;border-radius:12px;margin-top:6px;font-size:13.5px;';
+    div.textContent = `${r.studentName} — مستني موافقته/ا`;
+    box.appendChild(div);
+  });
+}
+
+async function loadStudents(){
+  const box = document.getElementById('studentsList');
+  box.innerHTML = '';
+  const snap = await db.collection('links').where('teacherId', '==', currentUid).get();
+
+  if(snap.empty){
+    box.innerHTML = '<p class="empty-note" style="padding:10px 0">مفيش طلاب مرتبطين لسه</p>';
+    return;
+  }
+
+  for(const linkDoc of snap.docs){
+    const link = linkDoc.data();
+    const sDoc = await db.collection('users').doc(link.studentId).get();
+    if(!sDoc.exists) continue;
+    const s = sDoc.data();
+
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:12px;background:#fff8fb;border:1.5px solid #ecdfe7;border-radius:14px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:700;">${s.name}</div>
+        <div style="font-size:12px;color:#8b8599;">${s.studentCode || ''}</div>
+      </div>
+      <button class="btn-sm btn-reject" data-link="${linkDoc.id}">إلغاء الربط</button>
+    `;
+    box.appendChild(div);
+  }
+
+  box.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-link]');
+    if(!btn) return;
+    btn.disabled = true;
+    await db.collection('links').doc(btn.dataset.link).delete();
+    loadStudents();
+  }, {once:true});
+}
+</script>
+</body>
+</html>

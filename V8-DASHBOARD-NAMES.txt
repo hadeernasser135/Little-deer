@@ -1,0 +1,5 @@
+Little Deer Access v8
+- student-dashboard.html = explicit copy of dashboard.html (Student Dashboard)
+- admin-dashboard.html = explicit copy of admin.html (Admin Dashboard)
+- teacher-dashboard.html remains unchanged
+- Original dashboard.html and admin.html are kept to preserve existing links and Firebase/application flow.

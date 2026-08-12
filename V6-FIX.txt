@@ -1,0 +1,3 @@
+Little Deer Access v6
+Fix: Login/Sign Up background now preserves the full image height on desktop/laptop instead of using background-size: cover, which was cropping the artwork.
+No Firebase or application logic was changed.

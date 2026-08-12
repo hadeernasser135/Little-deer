@@ -1,0 +1,6 @@
+Little Deer Access v10
+- Fixed the Admin Dashboard JavaScript syntax error that prevented Firebase from running.
+- The error was caused by an incorrectly escaped apostrophe in the unique student-code error message.
+- Added a visible Firestore loading error message as a fallback instead of leaving the page stuck on Loading dashboard.
+- UI, Firebase configuration, existing database data and management logic remain unchanged.
+- admin.html and admin-dashboard.html passed JavaScript syntax validation.

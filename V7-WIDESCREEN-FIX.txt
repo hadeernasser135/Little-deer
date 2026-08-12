@@ -1,0 +1,6 @@
+Little Deer Access v7
+Desktop/Login/Sign Up widescreen fix:
+- Replaced login-scene.png with the supplied 1536x864 widescreen artwork.
+- Background now uses cover + centered positioning so there is no solid-blue extension on wide screens.
+- Login/Sign Up panel remains positioned on the right so it does not cover the logo or deer characters.
+- Firebase/application logic is unchanged.

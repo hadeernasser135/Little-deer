@@ -1,0 +1,4 @@
+Little Deer Access v9
+- Redesigned admin.html and admin-dashboard.html to match the premium Little Deer dashboard theme.
+- Added themed sidebar, topbar, summary statistics, account search, styled user cards, status badges, book access controls and admin action buttons.
+- Existing Firebase authentication, Firestore reads/writes, student-code generation, subscription activation/renewal, suspension/rejection and allowedBooks logic are preserved.
